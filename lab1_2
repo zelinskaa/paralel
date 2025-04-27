@@ -1,0 +1,76 @@
+#include <iostream>
+#include <vector>
+#include <thread>
+#include <chrono>
+#include <windows.h>
+#include <cstdlib>
+
+using namespace std;
+
+void transpose_part(const vector<vector<int>>& matrix, vector<vector<int>>& transposed, int start_row, int end_row)
+{
+    int n = matrix.size();
+    for (int i = start_row; i < end_row; ++i)
+    {
+        for (int j = 0; j < n; ++j)
+        {
+            transposed[j][i] = matrix[i][j];
+        }
+    }
+}
+
+int main() {
+    SetConsoleOutputCP(1251);
+    int n;
+    cout << "Введіть розмір матриці n: ";
+    cin >> n;
+
+    vector<vector<int>> matrix(n, vector<int>(n));
+    vector<vector<int>> transposed(n, vector<int>(n));
+
+    for (int i = 0; i < n; ++i)
+    {
+        for (int j = 0; j < n; ++j)
+        {
+            matrix[i][j] = rand() % 100;
+        }
+    }
+
+    auto start = chrono::high_resolution_clock::now();
+
+    int num_threads = thread::hardware_concurrency(); // Число потоків стільки, скільки є вільних ядер, або просто 4
+    if (num_threads == 0)
+    {
+        num_threads = 4;
+    } 
+    vector<thread> threads;
+    int rows_per_thread = n / num_threads;
+    int extra_rows = n % num_threads;
+
+    int current_row = 0;
+    for (int i = 0; i < num_threads; ++i)
+    {
+        int start_row = current_row;
+        int end_row = start_row + rows_per_thread;
+        if (i < extra_rows) 
+        {
+            end_row++;
+        }
+        threads.emplace_back(transpose_part, cref(matrix), ref(transposed), start_row, end_row);
+        current_row = end_row;
+    }
+
+    for (auto& t : threads)
+    {
+        t.join();
+    }
+
+    auto end = chrono::high_resolution_clock::now();
+    auto elapsed_ms = chrono::duration_cast<chrono::milliseconds>(end - start);
+
+    cout << "Кількість потоків: " << num_threads << endl;
+    cout << "Час транспонування матриці " << n << "x" << n << ": " << elapsed_ms.count() << " мілісекунд" << endl;
+
+
+    return 0;
+}
