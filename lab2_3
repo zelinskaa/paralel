@@ -1,0 +1,76 @@
+#include <iostream>
+#include <vector>
+#include <chrono>
+#include <climits>
+#include <cstdlib>
+#include <ctime>
+#include <atomic>
+#include <thread>
+#include <windows.h>
+
+using namespace std;
+
+// Атомарна змінна для суми непарних чисел
+atomic<int> sum(0);
+// Атомарна змінна для найменшого непарного числа
+atomic<int> minOdd(INT_MAX);
+
+// Функція для обробки елементів масиву
+void process_array(const vector<int>& arr, int start, int end) {
+    for (int i = start; i < end; ++i) {
+        if (arr[i] % 2 != 0) {
+            int current_sum = sum.load();
+            while (!sum.compare_exchange_weak(current_sum, current_sum + arr[i])) {
+                // Пробуємо знову, якщо не вдалося змінити (можливо інший потік змінив значення)
+            }
+
+
+            int current_min = minOdd.load();
+            while (arr[i] < current_min) {
+                if (minOdd.compare_exchange_weak(current_min, arr[i])) {
+                    break;  // Виходимо, якщо успішно змінили значення
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    SetConsoleOutputCP(1251);
+    srand(time(0));
+
+    int n;
+    cout << "Введіть розмір масиву: ";
+    cin >> n;
+
+    vector<int> arr(n);
+    for (int i = 0; i < n; ++i) {
+        arr[i] = rand() % 100;
+    }
+
+
+    auto start_time = chrono::high_resolution_clock::now();
+
+    int num_threads = 4;
+    vector<thread> threads;
+    int chunk_size = n / num_threads;
+
+    for (int i = 0; i < num_threads; ++i) {
+        int start = i * chunk_size;
+        int end = (i == num_threads - 1) ? n : (i + 1) * chunk_size;
+        threads.push_back(thread(process_array, ref(arr), start, end));
+    }
+
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    auto end_time = chrono::high_resolution_clock::now();
+
+    auto elapsed = chrono::duration_cast<chrono::milliseconds>(end_time - start_time);
+    cout << "Час виконання: " << elapsed.count() << " мілісекунд." << endl;
+
+
+    return 0;
+}
